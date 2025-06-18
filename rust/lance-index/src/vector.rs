@@ -37,6 +37,7 @@ pub mod storage;
 pub mod transform;
 pub mod utils;
 pub mod v3;
+pub mod cagra;
 
 use super::pb;
 use crate::metrics::MetricsCollector;

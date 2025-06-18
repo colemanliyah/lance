@@ -261,6 +261,7 @@ impl DatasetIndexExt for Dataset {
         params: &dyn IndexParams,
         replace: bool,
     ) -> Result<()> {
+        eprintln!("index rust file!");
         if columns.len() != 1 {
             return Err(Error::Index {
                 message: "Only support building index on 1 column at the moment".to_string(),
@@ -275,6 +276,7 @@ impl DatasetIndexExt for Dataset {
             });
         };
 
+        eprintln!("deciding column!");
         // Load indices from the disk.
         let indices = self.load_indices().await?;
         let fri = self.open_frag_reuse_index(&NoOpMetricsCollector).await?;
@@ -299,6 +301,10 @@ impl DatasetIndexExt for Dataset {
                 });
             }
         }
+
+        eprintln!("indices, {:?}", indices);
+        eprintln!("index name {}" , index_name);
+        eprintln!("deciding indicies!");
 
         let index_id = Uuid::new_v4();
         let index_details = match (index_type, params.index_name()) {
@@ -338,6 +344,7 @@ impl DatasetIndexExt for Dataset {
                 inverted_index_details()
             }
             (IndexType::Vector, LANCE_VECTOR_INDEX) => {
+                eprintln!("vector index!");
                 // Vector index params.
                 let vec_params = params
                     .as_any()
@@ -347,6 +354,7 @@ impl DatasetIndexExt for Dataset {
                         location: location!(),
                     })?;
 
+                eprintln!("before going into build_vector_index");
                 // this is a large future so move it to heap
                 Box::pin(build_vector_index(
                     self,
@@ -402,6 +410,8 @@ impl DatasetIndexExt for Dataset {
             }
         };
 
+        eprintln!("before metadata!"); 
+
         let new_idx = IndexMetadata {
             uuid: index_id,
             name: index_name,
@@ -411,6 +421,9 @@ impl DatasetIndexExt for Dataset {
             index_details: Some(index_details),
             index_version: index_type.version(),
         };
+
+        eprintln!("{:?}", new_idx);
+
         let transaction = Transaction::new(
             self.manifest.version,
             Operation::CreateIndex {

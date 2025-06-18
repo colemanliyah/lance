@@ -26,6 +26,7 @@ use lance_index::vector::hnsw::HNSW;
 use lance_index::vector::ivf::storage::IvfModel;
 use lance_index::vector::pq::ProductQuantizer;
 use lance_index::vector::v3::shuffler::IvfShuffler;
+use lance_index::vector::cagra::CagraBuildParams;
 use lance_index::vector::{
     hnsw::{
         builder::HnswBuildParams,
@@ -59,6 +60,7 @@ pub enum StageParams {
     Hnsw(HnswBuildParams),
     PQ(PQBuildParams),
     SQ(SQBuildParams),
+    Cagra(CagraBuildParams),
 }
 
 // The version of the index file.
@@ -70,6 +72,7 @@ pub enum IndexFileVersion {
     V3,
 }
 
+// (TODO): May be nice to convert this into an enum to have one for the ivfpq stuff and one for cagra
 /// The parameters to build vector index.
 #[derive(Debug, Clone)]
 pub struct VectorIndexParams {
@@ -80,6 +83,9 @@ pub struct VectorIndexParams {
 
     /// The version of the index file.
     pub version: IndexFileVersion,
+
+    // If running cagra you will include params here 
+    pub cagra_params: Option<CagraBuildParams>,
 }
 
 impl VectorIndexParams {
@@ -89,12 +95,14 @@ impl VectorIndexParams {
     }
 
     pub fn ivf_flat(num_partitions: usize, metric_type: MetricType) -> Self {
+        eprintln!("ivfpq vector rust file!");
         let ivf_params = IvfBuildParams::new(num_partitions);
         let stages = vec![StageParams::Ivf(ivf_params)];
         Self {
             stages,
             metric_type,
             version: IndexFileVersion::V3,
+            cagra_params: None
         }
     }
 
@@ -113,6 +121,7 @@ impl VectorIndexParams {
         metric_type: MetricType,
         max_iterations: usize,
     ) -> Self {
+        eprintln!("ivfpq vector rust file!");
         let mut stages: Vec<StageParams> = vec![];
         stages.push(StageParams::Ivf(IvfBuildParams::new(num_partitions)));
 
@@ -124,10 +133,13 @@ impl VectorIndexParams {
         };
         stages.push(StageParams::PQ(pq_params));
 
+        eprintln!("finishes in vector.rs");
+
         Self {
             stages,
             metric_type,
             version: IndexFileVersion::V3,
+            cagra_params: None
         }
     }
 
@@ -137,11 +149,13 @@ impl VectorIndexParams {
         ivf: IvfBuildParams,
         pq: PQBuildParams,
     ) -> Self {
+        eprintln!("ivfpq params vector rust file!");
         let stages = vec![StageParams::Ivf(ivf), StageParams::PQ(pq)];
         Self {
             stages,
             metric_type,
             version: IndexFileVersion::V3,
+            cagra_params: None
         }
     }
 
@@ -153,6 +167,7 @@ impl VectorIndexParams {
         hnsw: HnswBuildParams,
         pq: PQBuildParams,
     ) -> Self {
+        eprintln!("ivf hnsw vector rust file!");
         let stages = vec![
             StageParams::Ivf(ivf),
             StageParams::Hnsw(hnsw),
@@ -162,6 +177,7 @@ impl VectorIndexParams {
             stages,
             metric_type,
             version: IndexFileVersion::V3,
+            cagra_params: None
         }
     }
 
@@ -173,6 +189,7 @@ impl VectorIndexParams {
         hnsw: HnswBuildParams,
         sq: SQBuildParams,
     ) -> Self {
+        eprintln!("ivfpq vector rust filehkgfhg!");
         let stages = vec![
             StageParams::Ivf(ivf),
             StageParams::Hnsw(hnsw),
@@ -182,6 +199,20 @@ impl VectorIndexParams {
             stages,
             metric_type,
             version: IndexFileVersion::V3,
+            cagra_params: None
+        }
+    }
+
+    pub fn cagra(
+        cagra_build_algo: String,
+    ) -> Self {
+        eprintln!("cagra vector rust file!");
+
+        Self {
+            stages: vec![], // unused
+            metric_type: MetricType::L2, // unused
+            version: IndexFileVersion::V3, // unused
+            cagra_params: Some(CagraBuildParams { cagra_build_algo }),
         }
     }
 }
@@ -236,6 +267,14 @@ pub(crate) async fn build_vector_index(
     params: &VectorIndexParams,
     fri: Option<Arc<FragReuseIndex>>,
 ) -> Result<()> {
+    print!(" vector index rust file!");
+
+    if let Some(cagra_params) = &params.cagra_params {
+        eprintln!("In Building Cagra vector index mode");
+        // dataset.indices_dir().child(uuid);
+        return lance_index::vector::cagra::build_cagra_index(cagra_params).await;
+    }
+
     let stages = &params.stages;
 
     if stages.is_empty() {
@@ -262,7 +301,8 @@ pub(crate) async fn build_vector_index(
             });
         }
     }
-
+    
+    eprintln!("stages part is done");
     let temp_dir = tempdir()?;
     let temp_dir_path = Path::from_filesystem_path(temp_dir.path())?;
     let shuffler = IvfShuffler::new(temp_dir_path, ivf_params.num_partitions);
@@ -306,6 +346,7 @@ pub(crate) async fn build_vector_index(
             }
         }
     } else if is_ivf_pq(stages) {
+        eprintln!("ivf pq vector");
         let len = stages.len();
         let StageParams::PQ(pq_params) = &stages[len - 1] else {
             return Err(Error::Index {
