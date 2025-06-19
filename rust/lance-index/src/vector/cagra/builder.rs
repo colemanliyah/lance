@@ -3,11 +3,16 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use snafu::location;
 use crate::Error;
+use pyo3::impl_::pymethods::IterBaseKind;
+
 
 // Parameters for building product quantizer.
 #[derive(Debug, Clone)]
 pub struct CagraBuildParams {
     /// cagra build algorithm
+    pub cagra_metric: String,
+    pub cagra_intermediate_graph_degree: u32,
+    pub cagra_graph_degree: u32,
     pub cagra_build_algo: String,
 
 }
@@ -15,8 +20,22 @@ pub struct CagraBuildParams {
 impl Default for CagraBuildParams {
     fn default() -> Self {
         Self {
-            cagra_build_algo: "nn_descent".to_string(),
+            cagra_metric: "sqeuclidean".to_string(),
+            cagra_intermediate_graph_degree: 128,
+            cagra_graph_degree: 64,
+            cagra_build_algo: "ivf_pq".to_string(),
         }
+    }
+}
+
+impl CagraBuildParams {
+    fn iter(&self) -> Vec<String> {
+        vec![
+            self.cagra_metric.to_string(),
+            self.cagra_intermediate_graph_degree.to_string(),
+            self.cagra_graph_degree.to_string(),
+            self.cagra_build_algo.to_string(),
+        ]
     }
 }
 
@@ -36,7 +55,17 @@ pub async fn build_cagra_index(
             location: location!(),
         })?;
 
-        function.call1((cagra_params.cagra_build_algo.clone(),)).map_err(|e| Error::Index {
+        // let mut array = ArrayVec::<_, 4>::new();
+        // for param in cagra_params.iter_tag(){
+        //     array.push(param);
+        // }
+
+        let mut cagra_params_vec = cagra_params.iter();
+        for item in cagra_params.iter() {
+            eprintln!("{}", item);
+        }
+
+        function.call1((cagra_params_vec,)).map_err(|e| Error::Index {
             message: format!("Failed to call function {}", e),
             location: location!(),
         })?;

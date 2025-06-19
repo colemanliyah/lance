@@ -1,2 +1,3 @@
-def build_cagra_index(cagra_build_algo):
+def build_cagra_index(cagra_params):
     print("here")
+    print(cagra_params)

@@ -204,6 +204,9 @@ impl VectorIndexParams {
     }
 
     pub fn cagra(
+        cagra_metric: String,
+        cagra_intermediate_graph_degree: u32,
+        cagra_graph_degree: u32,
         cagra_build_algo: String,
     ) -> Self {
         eprintln!("cagra vector rust file!");
@@ -212,7 +215,7 @@ impl VectorIndexParams {
             stages: vec![], // unused
             metric_type: MetricType::L2, // unused
             version: IndexFileVersion::V3, // unused
-            cagra_params: Some(CagraBuildParams { cagra_build_algo }),
+            cagra_params: Some(CagraBuildParams { cagra_metric, cagra_intermediate_graph_degree, cagra_graph_degree, cagra_build_algo }),
         }
     }
 }
