@@ -17,6 +17,9 @@ mod fixture_test;
 
 use self::{ivf::*, pq::PQIndex};
 use arrow_schema::DataType;
+use futures::StreamExt;
+use arrow_array::ArrayRef;
+use arrow::array::Int32Array;
 use builder::IvfIndexBuilder;
 use lance_file::reader::FileReader;
 use lance_index::frag_reuse::FragReuseIndex;
@@ -274,8 +277,19 @@ pub(crate) async fn build_vector_index(
 
     if let Some(cagra_params) = &params.cagra_params {
         eprintln!("In Building Cagra vector index mode");
+        let mut scanner = dataset.scan();
+        scanner.project(&[column])?;
+        scanner.with_row_id();
+        let mut stream = scanner.try_into_stream().await?;
+        let mut data: ArrayRef = Arc::new(Int32Array::from(Vec::<i32>::new()));
+        while let Some(batch) = stream.next().await {
+            let b = batch?;
+
+            data = b.column(0).clone();
+            // eprintln!("len of array of values {}", data.len());
+        }
         // dataset.indices_dir().child(uuid);
-        return lance_index::vector::cagra::build_cagra_index(cagra_params).await;
+        return lance_index::vector::cagra::build_cagra_index(&data, cagra_params).await;
     }
 
     let stages = &params.stages;
