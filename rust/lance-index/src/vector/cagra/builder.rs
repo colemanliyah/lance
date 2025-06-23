@@ -1,14 +1,11 @@
 use crate::Result;
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
 use pyo3::types::PyList;
 use snafu::location;
 use crate::Error;
-use pyo3::impl_::pymethods::IterBaseKind;
-use arrow_array::ArrayRef;
-use arrow::array::Int32Array;
-use arrow::datatypes::Int32Type;
+use arrow_array::{Array, PrimitiveArray, FixedSizeListArray};
 use std::sync::Arc;
+use arrow::datatypes::Float32Type;
 
 // Parameters for building product quantizer.
 #[derive(Debug, Clone)]
@@ -43,33 +40,34 @@ impl CagraBuildParams {
     }
 }
 
-// #[pyclass]
-// #[derive(Debug, Clone)]
-// pub struct pythonCagraParams {
-//     pub data: &ArrayRef,
-//     pub cagra_params: Vec<String>,
-// }
+fn print_type<T>(_: &T) { 
+    println!("{:?}", std::any::type_name::<T>());
+}
 
-// #[pymethods]
-// impl pythonCagraParams {
-//     fn displayData() -> &ArrayRef {
-//         self.data.clone()
-//     }
-// }
+fn array_to_pylist(py: Python<'_>, array: &Arc<dyn arrow_array::Array>) -> Py<PyList> {
+    //eprintln!("{:?}", print_type(&array));
 
-fn arrayref_to_pylist(py: Python<'_>, array: &ArrayRef) -> PyResult<PyObject> {
-    if let Some(int_arr) = array.as_any().downcast_ref::<Int32Array>() {
-        let py_values: Vec<i32> = (0..int_arr.len()).map(|i| int_arr.value(i)).collect();
+    if let Some(list_array) = array.as_any().downcast_ref::<FixedSizeListArray>() {
+        let py_outer_list = PyList::empty(py);
 
-        let py_list: Bound<'_, PyList> = PyList::new(py, py_values)?;
-        Ok(py_list.into_py(py))
-    }else{
-        Err(pyo3::exceptions::PyTypeError::new_err("Unsupported array type"))
+        for i in 0..list_array.len() {
+            let subarray = list_array.value(i);
+
+            if let Some(float_subarray) = subarray.as_any().downcast_ref::<PrimitiveArray<Float32Type>>(){
+                let py_inner_list = PyList::new(py, float_subarray).unwrap();
+                py_outer_list.append(py_inner_list).unwrap();
+            } else {
+                py_outer_list.append(PyList::empty(py)).unwrap();
+            }
+        }
+        return py_outer_list.into();
+    } else {
+        return PyList::empty(py).into();
     }
 }
 
 pub async fn build_cagra_index(
-    data: &ArrayRef,
+    data: &Arc<dyn arrow_array::Array>,
     cagra_params: &CagraBuildParams
 ) -> Result<()> {
     eprintln!("Cagra logic to go here");
@@ -85,29 +83,21 @@ pub async fn build_cagra_index(
             location: location!(),
         })?;
 
-        // let mut array = ArrayVec::<_, 4>::new();
-        // for param in cagra_params.iter_tag(){
-        //     array.push(param);
+        let data_result = array_to_pylist(py, data);
+        // if(data_result.is_empty()) {
+        //     eprintln!("Data not transformed properly");
         // }
-        let d_result = arrayref_to_pylist(py, data);
-        eprintln!("data that should be a pylist {:?}", d_result);
-        let d = match d_result {
-            Ok(obj) => obj,
-            Err(e) => return Err(Error::Index {
-                message: format!("Failed to call inner function: {}", e),
-                location: location!(),
-            }),
-        };
-        let mut cagra_params_vec = cagra_params.iter();
-        // for item in cagra_params.iter() {
-        //     eprintln!("{}", item);
-        // }
-        // let pythonParams = pythonCagraParams {
-        //     data:data,
-        //     cagra_params:cagra_params_vec
-        // }
+        // let data_list = match data_result {
+        //     Ok(obj) => obj,
+        //     Err(e) => return Err(Error::Index {
+        //         message: format!("Failed to call inner function: {}", e),
+        //         location: location!(),
+        //     }),
+        // };
 
-        function.call1((d, cagra_params_vec, )).map_err(|e| Error::Index {
+        let cagra_params_vec = cagra_params.iter();
+
+        function.call1((data_result, cagra_params_vec)).map_err(|e| Error::Index {
             message: format!("Failed to call function {}", e),
             location: location!(),
         })?;

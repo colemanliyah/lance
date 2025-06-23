@@ -17,9 +17,6 @@ mod fixture_test;
 
 use self::{ivf::*, pq::PQIndex};
 use arrow_schema::DataType;
-use futures::StreamExt;
-use arrow_array::ArrayRef;
-use arrow::array::Int32Array;
 use builder::IvfIndexBuilder;
 use lance_file::reader::FileReader;
 use lance_index::frag_reuse::FragReuseIndex;
@@ -263,6 +260,10 @@ fn is_ivf_hnsw(stages: &[StageParams]) -> bool {
     matches!(&stages[0], StageParams::Ivf(_)) && matches!(&stages[1], StageParams::Hnsw(_))
 }
 
+fn print_type<T>(_: &T) { 
+    println!("{:?}", std::any::type_name::<T>());
+}
+
 /// Build a Vector Index
 #[instrument(level = "debug", skip(dataset))]
 pub(crate) async fn build_vector_index(
@@ -274,35 +275,25 @@ pub(crate) async fn build_vector_index(
     fri: Option<Arc<FragReuseIndex>>,
 ) -> Result<()> {
     print!(" vector index rust file!");
-    eprintln!("number of rows {}", dataset.count_rows());
+    eprintln!("number of rows {:?}", dataset.count_rows(None).await.unwrap());
 
     if let Some(cagra_params) = &params.cagra_params {
         eprintln!("In Building Cagra vector index mode");
         let mut scanner = dataset.scan();
         scanner.project(&[column])?;
         scanner.with_row_id();
-        let mut stream = scanner.try_into_stream().await?;
-        let mut data: ArrayRef = Arc::new(Int32Array::from(Vec::<i32>::new()));
+        let batch = scanner.try_into_batch().await?;
 
-        eprintln!("trying schema");
-        let schema = dataset.schema();
-        print(dir(schema))
-
-        let field = schema.field(column).ok_or(Error::Index {
-            message: format!("Column {} does not exist in schema {}", column, schema),
+        let data = batch.column_by_name(column).ok_or(Error::Index {
+            message: format!("Column {} does not exist in returned batch", column),
             location: location!(),
         })?;
-        eprintln!("field {}", field);
 
-        while let Some(batch) = stream.next().await {
-            // eprintln!("batch {:?}", batch);
-            let b = batch?;
+        // eprintln!("batch array {:?},", data);
+        // eprintln!("type of data in vec.rs {:?}", print_type(data));
+        // eprintln!("array size {}", data.value(0).len());
 
-            data = b.column(0).clone();
-            // eprintln!("len of array of values {}", data.len());
-        }
-        // dataset.indices_dir().child(uuid);
-        return lance_index::vector::cagra::build_cagra_index(&data, cagra_params).await;
+        return lance_index::vector::cagra::build_cagra_index(data, cagra_params).await;
     }
 
     let stages = &params.stages;
