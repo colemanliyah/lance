@@ -274,6 +274,7 @@ pub(crate) async fn build_vector_index(
     fri: Option<Arc<FragReuseIndex>>,
 ) -> Result<()> {
     print!(" vector index rust file!");
+    eprintln!("number of rows {}", dataset.count_rows());
 
     if let Some(cagra_params) = &params.cagra_params {
         eprintln!("In Building Cagra vector index mode");
@@ -282,7 +283,19 @@ pub(crate) async fn build_vector_index(
         scanner.with_row_id();
         let mut stream = scanner.try_into_stream().await?;
         let mut data: ArrayRef = Arc::new(Int32Array::from(Vec::<i32>::new()));
+
+        eprintln!("trying schema");
+        let schema = dataset.schema();
+        print(dir(schema))
+
+        let field = schema.field(column).ok_or(Error::Index {
+            message: format!("Column {} does not exist in schema {}", column, schema),
+            location: location!(),
+        })?;
+        eprintln!("field {}", field);
+
         while let Some(batch) = stream.next().await {
+            // eprintln!("batch {:?}", batch);
             let b = batch?;
 
             data = b.column(0).clone();

@@ -90,6 +90,7 @@ pub async fn build_cagra_index(
         //     array.push(param);
         // }
         let d_result = arrayref_to_pylist(py, data);
+        eprintln!("data that should be a pylist {:?}", d_result);
         let d = match d_result {
             Ok(obj) => obj,
             Err(e) => return Err(Error::Index {
