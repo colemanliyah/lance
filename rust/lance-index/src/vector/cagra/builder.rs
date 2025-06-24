@@ -1,11 +1,17 @@
 use crate::Result;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
+use pyo3::types::PyDict;
 use snafu::location;
 use crate::Error;
 use arrow_array::{Array, PrimitiveArray, FixedSizeListArray};
 use std::sync::Arc;
 use arrow::datatypes::Float32Type;
+use pyo3::types::IntoPyDict;
+use crate:: {
+    dataset::Dataset
+    index::INDEX_FILE_NAME
+}
 
 // Parameters for building product quantizer.
 #[derive(Debug, Clone)]
@@ -30,13 +36,15 @@ impl Default for CagraBuildParams {
 }
 
 impl CagraBuildParams {
-    fn iter(&self) -> Vec<String> {
-        vec![
-            self.cagra_metric.to_string(),
-            self.cagra_intermediate_graph_degree.to_string(),
-            self.cagra_graph_degree.to_string(),
-            self.cagra_build_algo.to_string(),
-        ]
+    fn iter(&self, py: Python<'_>) -> Py<PyDict> {
+        let param_vec = vec![
+            ("metric", self.cagra_metric.to_string()),
+            ("intermediate_graph_degree", self.cagra_intermediate_graph_degree.to_string()),
+            ("graph_degree", self.cagra_graph_degree.to_string()),
+            ("algo", self.cagra_build_algo.to_string()),
+        ];
+
+        return param_vec.into_py_dict(py).expect("Failed to convert to PyDict").into();
     }
 }
 
@@ -66,7 +74,53 @@ fn array_to_pylist(py: Python<'_>, array: &Arc<dyn arrow_array::Array>) -> Py<Py
     }
 }
 
+// #[derive(Debug)]
+// pub struct CagraIndexMetaData {
+
+// }
+
+// impl CagraIndexMetaData {
+//     pub fn new() -> Self {
+//         Self {
+
+//         }
+//     }
+// }
+
+// pub async fn saveCagraIndex(
+//     object_store: &ObjectStore,
+//     index_dir: Path,
+//     column: &str,
+//     index_name: &str,
+//     uuid: &str,
+//     dataset_version: u64,
+//     metric_type: MetricType
+// ) -> Result<()> {
+//     let path = index_dir.child(uuid).child(INDEX_FILE_NAME);
+//     let mut writer = object_store.create(&path).await?;
+
+//     let mut file = tokio::fs::File::open("/workspace/cagra.index").await?;
+//     tokio::io::copy(&mut file, &mut writer).await?;
+
+//     let metadata = CagraIndexMetaData {
+
+//     };
+
+//     let metadata = pb::Index::try_from(&metadata)?;
+//     let pos = writer.write_protobuf(&metadata).await?;
+
+//     //writer.write_magics(pos, 0, 1, MAGIC).await?; //Still not sure about this line
+
+//     writer.shutdown().await?;
+
+//     Ok(())
+// }
+
 pub async fn build_cagra_index(
+    dataset: &Dataset,
+    column: &str,
+    uuid: &str,
+    index_name: &str,
     data: &Arc<dyn arrow_array::Array>,
     cagra_params: &CagraBuildParams
 ) -> Result<()> {
@@ -95,7 +149,7 @@ pub async fn build_cagra_index(
         //     }),
         // };
 
-        let cagra_params_vec = cagra_params.iter();
+        let cagra_params_vec = cagra_params.iter(py);
 
         function.call1((data_result, cagra_params_vec)).map_err(|e| Error::Index {
             message: format!("Failed to call function {}", e),
@@ -104,4 +158,7 @@ pub async fn build_cagra_index(
 
         Ok(())
     })
+
+    eprintln!("out of python")
+
 }

@@ -293,7 +293,7 @@ pub(crate) async fn build_vector_index(
         // eprintln!("type of data in vec.rs {:?}", print_type(data));
         // eprintln!("array size {}", data.value(0).len());
 
-        return lance_index::vector::cagra::build_cagra_index(data, cagra_params).await;
+        return lance_index::vector::cagra::build_cagra_index(dataset, column, uuid, name, data, cagra_params).await;
     }
 
     let stages = &params.stages;
