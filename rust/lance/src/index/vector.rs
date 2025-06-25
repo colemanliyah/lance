@@ -293,6 +293,7 @@ pub(crate) async fn build_vector_index(
         // Calls Builder.rs file under lance-index and calls python to create index
         let _ = lance_index::vector::cagra::build_cagra_index(data, cagra_params).await;
 
+        eprintln!("exited python functionality, about to save");
         // Call cagra module in this create to save the index
         return cagra::save_cagra_index(dataset, data, column, name, uuid).await;
     }

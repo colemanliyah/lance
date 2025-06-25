@@ -2,13 +2,12 @@ use crate::Dataset;
 use crate::Result;
 use lance_index::pb;
 use snafu::location;
-use lance_index::pb::{Cagra, VectorIndex, VectorIndexStage};
+use lance_index::pb::{Cagra, VectorIndexStage};
 use lance_index::pb::vector_index_stage::Stage;
 use lance_core::Error;
-use lance_index::vector::cagra;
 use lance_linalg::distance::MetricType;
 use std::sync::Arc;
-use arrow_array::{Array, PrimitiveArray, FixedSizeListArray};
+use arrow_array::{Array, FixedSizeListArray};
 use std::collections::HashMap;
 use lance_io::traits::WriteExt;
 
