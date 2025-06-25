@@ -130,6 +130,11 @@ message DiskAnn {
   repeated uint64 entries = 6;
 }
 
+message Cagra {
+  string build_algo = 1;
+  string metric = 2;
+}
+
 // One stage in the vector index pipeline.
 message VectorIndexStage {
   oneof stage {
@@ -143,6 +148,8 @@ message VectorIndexStage {
     Transform transform = 4;
     // DiskANN
     DiskAnn diskann = 5;
+    // Cagra
+    Cagra cagra = 6;
   }
 }
 

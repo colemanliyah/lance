@@ -8,10 +8,6 @@ use arrow_array::{Array, PrimitiveArray, FixedSizeListArray};
 use std::sync::Arc;
 use arrow::datatypes::Float32Type;
 use pyo3::types::IntoPyDict;
-use crate:: {
-    dataset::Dataset
-    index::INDEX_FILE_NAME
-}
 
 // Parameters for building product quantizer.
 #[derive(Debug, Clone)]
@@ -74,53 +70,7 @@ fn array_to_pylist(py: Python<'_>, array: &Arc<dyn arrow_array::Array>) -> Py<Py
     }
 }
 
-// #[derive(Debug)]
-// pub struct CagraIndexMetaData {
-
-// }
-
-// impl CagraIndexMetaData {
-//     pub fn new() -> Self {
-//         Self {
-
-//         }
-//     }
-// }
-
-// pub async fn saveCagraIndex(
-//     object_store: &ObjectStore,
-//     index_dir: Path,
-//     column: &str,
-//     index_name: &str,
-//     uuid: &str,
-//     dataset_version: u64,
-//     metric_type: MetricType
-// ) -> Result<()> {
-//     let path = index_dir.child(uuid).child(INDEX_FILE_NAME);
-//     let mut writer = object_store.create(&path).await?;
-
-//     let mut file = tokio::fs::File::open("/workspace/cagra.index").await?;
-//     tokio::io::copy(&mut file, &mut writer).await?;
-
-//     let metadata = CagraIndexMetaData {
-
-//     };
-
-//     let metadata = pb::Index::try_from(&metadata)?;
-//     let pos = writer.write_protobuf(&metadata).await?;
-
-//     //writer.write_magics(pos, 0, 1, MAGIC).await?; //Still not sure about this line
-
-//     writer.shutdown().await?;
-
-//     Ok(())
-// }
-
 pub async fn build_cagra_index(
-    dataset: &Dataset,
-    column: &str,
-    uuid: &str,
-    index_name: &str,
     data: &Arc<dyn arrow_array::Array>,
     cagra_params: &CagraBuildParams
 ) -> Result<()> {
@@ -158,7 +108,5 @@ pub async fn build_cagra_index(
 
         Ok(())
     })
-
-    eprintln!("out of python")
 
 }

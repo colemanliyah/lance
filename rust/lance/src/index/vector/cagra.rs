@@ -1,6 +1,7 @@
 use crate::Dataset;
 use crate::Result;
 use lance_index::pb;
+use snafu::location;
 use lance_index::pb::{Cagra, VectorIndex, VectorIndexStage};
 use lance_index::pb::vector_index_stage::Stage;
 use lance_core::Error;
@@ -8,7 +9,8 @@ use lance_index::vector::cagra;
 use lance_linalg::distance::MetricType;
 use std::sync::Arc;
 use arrow_array::{Array, PrimitiveArray, FixedSizeListArray};
-
+use std::collections::HashMap;
+use lance_io::traits::WriteExt;
 
 use crate::{
     index::{INDEX_FILE_NAME}
@@ -68,6 +70,14 @@ impl TryFrom<&CagraIndexMetaData> for pb::Index {
             }))
         };
 
+        let metric_conversion = HashMap::from([
+            ("sqeuclidean".to_string(), MetricType::L2),
+            ("inner_product".to_string(), MetricType::Dot)
+
+        ]);
+
+        let index = metric_conversion.get(idx.metric.as_str()).cloned().expect("Metric must be 'sqeuclidea' or 'inner product' ");
+
         Ok(Self {
             name: idx.name.clone(),
             columns: vec![idx.column.clone()],
@@ -77,9 +87,15 @@ impl TryFrom<&CagraIndexMetaData> for pb::Index {
                 spec_version: 1,
                 dimension: idx.dimension, //array.shape()[1]
                 stages: vec![cagra_stage],
-                metric_type: match idx.algo {
+                metric_type: match index {
                     MetricType::L2 => pb::VectorMetricType::L2.into(), // Mimic euclidean, closest for sequclidean
-                    MetricType::Dot => pb::VectorMetricType::Dot.into()// Mimic inner_product
+                    MetricType::Dot => pb::VectorMetricType::Dot.into(), // Mimic inner_product
+                    _ => {
+                        return Err(Error::Index { 
+                            message: "unsupported cagra distance metric".to_string(),
+                            location: location!(),
+                        })
+                    }
                 },
             })),
         })
@@ -113,18 +129,18 @@ pub async fn save_cagra_index(
     let mut file = tokio::fs::File::open("/workspace/cagra.index").await?; //eventually this should not be hardcoded
     tokio::io::copy(&mut file, &mut writer).await?;
 
+
     let metadata = CagraIndexMetaData {
         name: index_name.to_string(),
         column: column.to_string(),
         dataset_version,
-        metric: "metric".to_string(),
-        algo: "algo".to_string(),
+        metric: "sqeuclidean".to_string(), // Change later to not be hardcoded
+        algo: "ivf_pq".to_string(), // Change later to not be hardcoded
         dimension: extract_dimension(data)
     };
 
     let metadata = pb::Index::try_from(&metadata)?;
     let pos = writer.write_protobuf(&metadata).await?;
-
     //writer.write_magics(pos, 0, 1, MAGIC).await?; //Still not sure about this line
 
     writer.shutdown().await?;
