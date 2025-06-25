@@ -11,6 +11,7 @@ pub mod builder;
 pub mod ivf;
 pub mod pq;
 pub mod utils;
+pub mod cagra;
 
 #[cfg(test)]
 mod fixture_test;
@@ -278,7 +279,7 @@ pub(crate) async fn build_vector_index(
     eprintln!("number of rows {:?}", dataset.count_rows(None).await.unwrap());
 
     if let Some(cagra_params) = &params.cagra_params {
-        eprintln!("In Building Cagra vector index mode");
+        // Getting the one embedding column of data         
         let mut scanner = dataset.scan();
         scanner.project(&[column])?;
         scanner.with_row_id();
@@ -289,11 +290,11 @@ pub(crate) async fn build_vector_index(
             location: location!(),
         })?;
 
-        // eprintln!("batch array {:?},", data);
-        // eprintln!("type of data in vec.rs {:?}", print_type(data));
-        // eprintln!("array size {}", data.value(0).len());
+        // Calls Builder.rs file under lance-index and calls python to create index
+        let _ = lance_index::vector::cagra::build_cagra_index(data, cagra_params).await;
 
-        return lance_index::vector::cagra::build_cagra_index(dataset, column, uuid, name, data, cagra_params).await;
+        // Call cagra module in this create to save the index
+        return cagra::save_cagra_index(dataset, data, column, name, uuid).await;
     }
 
     let stages = &params.stages;
