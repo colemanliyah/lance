@@ -125,7 +125,7 @@ pub async fn save_cagra_index(
     let path = index_dir.child(uuid).child(INDEX_FILE_NAME);
     let mut writer = object_store.create(&path).await?;
 
-    let mut file = tokio::fs::File::open("/workspace/cagra.index").await?; //eventually this should not be hardcoded
+    let mut file = tokio::fs::File::open("/workspace/cagra_index.bin").await?; //eventually this should not be hardcoded
     tokio::io::copy(&mut file, &mut writer).await?;
 
 
