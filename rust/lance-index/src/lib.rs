@@ -99,6 +99,7 @@ pub enum IndexType {
     IvfPq = 103,
     IvfHnswSq = 104,
     IvfHnswPq = 105,
+    Cagra = 106
 }
 
 impl std::fmt::Display for IndexType {
@@ -115,6 +116,7 @@ impl std::fmt::Display for IndexType {
             Self::IvfSq => write!(f, "IVF_SQ"),
             Self::IvfHnswSq => write!(f, "IVF_HNSW_SQ"),
             Self::IvfHnswPq => write!(f, "IVF_HNSW_PQ"),
+            Self::Cagra => write!(f, "CAGRA"),
         }
     }
 }
@@ -136,6 +138,7 @@ impl TryFrom<i32> for IndexType {
             v if v == Self::IvfPq as i32 => Ok(Self::IvfPq),
             v if v == Self::IvfHnswSq as i32 => Ok(Self::IvfHnswSq),
             v if v == Self::IvfHnswPq as i32 => Ok(Self::IvfHnswPq),
+            v if v == Self::Cagra as i32 => Ok(Self::Cagra),
             _ => Err(Error::InvalidInput {
                 source: format!("the input value {} is not a valid IndexType", value).into(),
                 location: location!(),
@@ -166,6 +169,7 @@ impl IndexType {
                 | Self::IvfHnswPq
                 | Self::IvfFlat
                 | Self::IvfSq
+                | Self::Cagra
         )
     }
 
@@ -191,7 +195,8 @@ impl IndexType {
             | Self::IvfSq
             | Self::IvfPq
             | Self::IvfHnswSq
-            | Self::IvfHnswPq => 0,
+            | Self::IvfHnswPq 
+            | Self::Cagra => 0, // Cagra is a custom index so may need to change later
         }
     }
 }

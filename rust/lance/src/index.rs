@@ -250,6 +250,15 @@ fn vector_index_details() -> prost_types::Any {
     prost_types::Any::from_msg(&details).unwrap()
 }
 
+fn cagra_index_details(name: &str, column: &str) -> prost_types::Any {
+    let details = lance_table::format::pb::CagraIndexMetaDataDetails {
+        name: name.to_string(),
+        column: column.to_string(),
+        index_type: "CAGRA".to_string()
+    };
+    return prost_types::Any::from_msg(&details).unwrap()
+}
+
 #[async_trait]
 impl DatasetIndexExt for Dataset {
     #[instrument(skip_all)]
@@ -365,7 +374,14 @@ impl DatasetIndexExt for Dataset {
                     fri,
                 ))
                 .await?;
-                vector_index_details()
+
+                let index_details = if vec_params.cagra_params.is_some() {
+                    cagra_index_details(&index_name, column)
+
+                } else { 
+                    vector_index_details()
+                };
+                index_details
             }
             // Can't use if let Some(...) here because it's not stable yet.
             // TODO: fix after https://github.com/rust-lang/rust/issues/51114
