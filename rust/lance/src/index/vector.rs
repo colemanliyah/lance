@@ -295,7 +295,8 @@ pub(crate) async fn build_vector_index(
 
         eprintln!("exited python functionality, about to save");
         // Call cagra module in this create to save the index
-        return cagra::save_cagra_index(dataset, data, column, name, uuid).await;
+
+        return cagra::save_cagra_index(dataset, data, params.cagra_params.as_ref().unwrap(), column, name, uuid).await; // To change the unwrap part to if Some()
     }
 
     let stages = &params.stages;

@@ -1,6 +1,9 @@
+use crate::index::vector::VectorIndexParams;
 use crate::Dataset;
 use crate::Result;
 use lance_index::pb;
+use lance_index::pb::VectorIndex;
+use lance_index::vector::cagra::CagraBuildParams;
 use snafu::location;
 use lance_index::pb::{Cagra, VectorIndexStage};
 use lance_index::pb::vector_index_stage::Stage;
@@ -113,6 +116,7 @@ pub fn extract_dimension(data: &Arc<dyn arrow_array::Array>) -> u32 {
 pub async fn save_cagra_index(
     dataset: &Dataset,
     data: &Arc<dyn arrow_array::Array>,
+    params: &CagraBuildParams,
     column: &str,
     index_name: &str,
     uuid: &str,
@@ -133,8 +137,8 @@ pub async fn save_cagra_index(
         name: index_name.to_string(),
         column: column.to_string(),
         dataset_version,
-        metric: "sqeuclidean".to_string(), // Change later to not be hardcoded
-        algo: "ivf_pq".to_string(), // Change later to not be hardcoded
+        metric: params.cagra_metric.to_string(), // Change later to not be hardcoded
+        algo: params.cagra_build_algo.to_string(), // Change later to not be hardcoded
         dimension: extract_dimension(data)
     };
 
