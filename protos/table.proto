@@ -374,6 +374,12 @@ message InvertedIndexDetails {}
 message NGramIndexDetails {}
 message VectorIndexDetails {}
 
+message CagraIndexMetaDataDetails {
+  string name = 1;
+  string column = 2;
+  string index_type = 4;
+}
+
 message FragmentReuseIndexDetails {
 
   oneof content {
