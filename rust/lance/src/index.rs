@@ -846,6 +846,7 @@ impl DatasetIndexExt for Dataset {
         partition_id: usize,
         with_vector: bool,
     ) -> Result<SendableRecordBatchStream> {
+        eprintln!("alright then");
         let indices = self.load_indices_by_name(index_name).await?;
         if indices.is_empty() {
             return Err(Error::IndexNotFound {
@@ -997,6 +998,7 @@ impl DatasetIndexInternalExt for Dataset {
         uuid: &str,
         metrics: &dyn MetricsCollector,
     ) -> Result<Arc<dyn VectorIndex>> {
+        eprintln!("open vector index function");
         let cache_key = index_cache_key(self, uuid).await.unwrap();
         if let Some(index) = self.session.index_cache.get_vector(cache_key.as_ref()) {
             log::debug!("Found vector index in cache uuid: {}", uuid);
@@ -1075,6 +1077,7 @@ impl DatasetIndexInternalExt for Dataset {
 
                 info!(target: TRACE_IO_EVENTS, index_uuid=uuid, type=IO_TYPE_OPEN_VECTOR, version="0.3", index_type=index_metadata.index_type);
 
+                eprintln!("{:?}", index_metadata.index_type);
                 match index_metadata.index_type.as_str() {
                     "IVF_FLAT" => match element_type {
                         DataType::Float16 | DataType::Float32 | DataType::Float64 => {

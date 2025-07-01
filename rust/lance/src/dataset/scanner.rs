@@ -2127,6 +2127,7 @@ impl Scanner {
 
     // ANN/KNN search execution node with optional prefilter
     async fn knn(&self, filter_plan: &FilterPlan) -> Result<Arc<dyn ExecutionPlan>> {
+        eprintln!("no idea");
         let Some(q) = self.nearest.as_ref() else {
             return Err(Error::invalid_input(
                 "No nearest query".to_string(),
@@ -2227,6 +2228,7 @@ impl Scanner {
         mut knn_node: Arc<dyn ExecutionPlan>,
         filter_plan: &FilterPlan,
     ) -> Result<Arc<dyn ExecutionPlan>> {
+        eprintln!("no idea part 2");
         // Check if we've created new versions since the index was built.
         let unindexed_fragments = self.dataset.unindexed_fragments(&index.name).await?;
         if !unindexed_fragments.is_empty() {
