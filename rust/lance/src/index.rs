@@ -66,6 +66,7 @@ use snafu::location;
 use tracing::{info, instrument};
 use uuid::Uuid;
 use vector::ivf::v2::IVFIndex;
+use vector::cagra::CagraIndex;
 use vector::utils::get_vector_type;
 
 pub(crate) mod append;
@@ -1010,13 +1011,17 @@ impl DatasetIndexInternalExt for Dataset {
         let index_file = index_dir.child(INDEX_FILE_NAME);
         let reader: Arc<dyn Reader> = self.object_store.open(&index_file).await?.into();
 
+        eprintln!("trace 1");
+
         let tailing_bytes = read_last_block(reader.as_ref()).await?;
         let (major_version, minor_version) = read_version(&tailing_bytes)?;
 
         // the index file is in lance format since version (0,2)
         // TODO: we need to change the legacy IVF_PQ to be in lance format
+        eprintln!("trace 2");
         let index = match (major_version, minor_version) {
             (0, 1) | (0, 0) => {
+                eprintln!("what 1");
                 info!(target: TRACE_IO_EVENTS, index_uuid=uuid, type=IO_TYPE_OPEN_VECTOR, version="0.1", index_type="IVF_PQ");
                 let proto = open_index_proto(reader.as_ref()).await?;
                 match &proto.implementation {
@@ -1032,6 +1037,7 @@ impl DatasetIndexInternalExt for Dataset {
             }
 
             (0, 2) => {
+                eprintln!("what 2");
                 info!(target: TRACE_IO_EVENTS, index_uuid=uuid, type=IO_TYPE_OPEN_VECTOR, version="0.2", index_type="IVF_PQ");
                 let reader = FileReader::try_new_self_described_from_reader(
                     reader.clone(),
@@ -1043,6 +1049,7 @@ impl DatasetIndexInternalExt for Dataset {
             }
 
             (0, 3) => {
+                eprintln!("what 3");
                 let scheduler = ScanScheduler::new(
                     self.object_store.clone(),
                     SchedulerConfig::max_bandwidth(&self.object_store),
@@ -1058,6 +1065,7 @@ impl DatasetIndexInternalExt for Dataset {
                     FileReaderOptions::default(),
                 )
                 .await?;
+                eprintln!("trace 3");
                 let index_metadata = reader
                     .schema()
                     .metadata
@@ -1066,15 +1074,19 @@ impl DatasetIndexInternalExt for Dataset {
                         message: "Index Metadata not found".to_owned(),
                         location: location!(),
                     })?;
+                eprintln!("trace 4");
                 let index_metadata: lance_index::IndexMetadata =
                     serde_json::from_str(index_metadata)?;
+                eprintln!("trace 5");
                 let field = self.schema().field(column).ok_or_else(|| Error::Index {
                     message: format!("Column {} does not exist in the schema", column),
                     location: location!(),
                 })?;
 
+                eprintln!("trace 6");
                 let (_, element_type) = get_vector_type(self.schema(), column)?;
 
+                eprintln!("trace 7");
                 info!(target: TRACE_IO_EVENTS, index_uuid=uuid, type=IO_TYPE_OPEN_VECTOR, version="0.3", index_type=index_metadata.index_type);
 
                 eprintln!("{:?}", index_metadata.index_type);
@@ -1145,6 +1157,14 @@ impl DatasetIndexInternalExt for Dataset {
                         )
                         .await?;
                         Ok(Arc::new(ivf) as Arc<dyn VectorIndex>)
+                    }
+                    
+                    "CAGRA" => {
+                        let cagra = CagraIndex::new(
+                            "temp".to_string(),
+                            "temp".to_string()
+                        );
+                        Ok(Arc::new(cagra) as Arc<dyn VectorIndex>)
                     }
 
                     _ => Err(Error::Index {
