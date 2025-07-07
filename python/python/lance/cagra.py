@@ -24,3 +24,8 @@ def build_cagra_index(data, cagra_params):
     print(f"\nTime to build index {endBuildIndex - startBuildIndex:.2f} seconds\n")
 
     cagra.save("/workspace/cagra_index.bin", index)
+
+def search_cagra(queries, path_to_index, k):
+    # can add search params later
+    print(queries)
+    print("in search")

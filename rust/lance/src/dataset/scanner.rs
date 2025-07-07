@@ -6,6 +6,8 @@ use std::ops::Range;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
+use pyo3::prelude::*;
+use pyo3::types::PyModule;
 
 use arrow::array::AsArray;
 use arrow_array::{Array, Float32Array, Int64Array, RecordBatch};
@@ -76,6 +78,9 @@ use crate::io::exec::{
 use crate::{datatypes::Schema, io::exec::fts::BooleanQueryExec};
 use crate::{Error, Result};
 use snafu::location;
+
+use prost::Message;
+use lance_table::format::pb::CagraIndexMetaDataDetails;
 
 pub use lance_datafusion::exec::{ExecutionStatsCallback, ExecutionSummaryCounts};
 #[cfg(feature = "substrait")]
@@ -2229,6 +2234,43 @@ impl Scanner {
         filter_plan: &FilterPlan,
     ) -> Result<Arc<dyn ExecutionPlan>> {
         eprintln!("no idea part 2");
+        eprintln!("query in scanner is {:?}", q);
+        eprintln!("index in scanner is {:?}", index);
+        eprintln!("testing index extraction {:?}", index.index_details);
+
+        //deserialize the proto index.index_details, figure out the index or message then reroute it to cagra path
+        if let Some(any) = &index.index_details {
+            if any.type_url.contains("Cagra") {
+
+                let details: CagraIndexMetaDataDetails = CagraIndexMetaDataDetails::decode(&*any.value)?;
+                eprintln!("details are {:?}", details);
+
+                Python::with_gil::<_, std::result::Result<(), lance_core::Error>>(|py| {
+                    let module = PyModule::import(py, "lance.cagra").map_err(|e| Error::Index {
+                        message: format!("Failed to import lance.cagra: {}", e),
+                        location: location!(),
+                    })?;
+
+                    let function = module.getattr("search_cagra").map_err(|e| Error::Index {
+                        message: format!("Failed to get attribute {}", e),
+                        location: location!(),
+                    })?;
+
+                    // change queries array to one pyo3 can understand
+
+                    // TODO: Remove hard code of k
+                    function.call1((q.key, "/workspace/cagra_index.bin", 384)).map_err(|e| Error::Index {
+                        message: format!("Failed to call function {}", e),
+                        location: location!(),
+                    })?;
+
+                    Ok(())
+                });
+            }
+        } 
+
+        eprintln!("still came here i guess");
+
         // Check if we've created new versions since the index was built.
         let unindexed_fragments = self.dataset.unindexed_fragments(&index.name).await?;
         if !unindexed_fragments.is_empty() {
