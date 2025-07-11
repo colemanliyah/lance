@@ -6,6 +6,8 @@ use std::ops::Range;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
+use pyo3::prelude::*;
+use pyo3::types::PyModule;
 
 use arrow::array::AsArray;
 use arrow_array::{Array, Float32Array, Int64Array, RecordBatch};
@@ -77,9 +79,16 @@ use crate::{datatypes::Schema, io::exec::fts::BooleanQueryExec};
 use crate::{Error, Result};
 use snafu::location;
 
+use prost::Message;
+use lance_table::format::pb::CagraIndexMetaDataDetails;
+
 pub use lance_datafusion::exec::{ExecutionStatsCallback, ExecutionSummaryCounts};
 #[cfg(feature = "substrait")]
 use lance_datafusion::substrait::parse_substrait;
+
+use arrow_schema::Field as OtherField;
+use arrow_array::ArrayRef;
+use arrow_array::StringArray;
 
 pub(crate) const BATCH_SIZE_FALLBACK: usize = 8192;
 // For backwards compatibility / historical reasons we re-calculate the default batch size
@@ -1433,6 +1442,35 @@ impl Scanner {
         };
         let mut use_limit_node = true;
 
+        // Check if it's a cagra index
+        if let Some(n) = &self.nearest {
+            let vector_col_name = &n.column;
+            let indicies_loaded = self.dataset.load_indices().await?;
+
+            let index_opt = indicies_loaded.iter().find(|idx| {
+                idx.fields.iter().any(|field| {
+                    self.dataset.schema().field_by_id(*field).unwrap().name == *vector_col_name
+                })
+            });
+            
+            if let Some(index) = index_opt {
+                if let Some(any) = &index.index_details {
+                    if any.type_url.contains("Cagra") {
+
+                        let cagra_schema = Arc::new(ArrowSchema::new(vec![
+                            OtherField::new("cagra_marker", DataType::Utf8, false),
+                        ]));
+
+                        let empty_exec = Arc::new(EmptyExec::new(cagra_schema));
+                        let exec: Arc<dyn ExecutionPlan> = empty_exec;
+
+                        return Ok(exec);
+                    }
+                }
+            }
+
+        }
+
         // Stage 1: source (either an (K|A)NN search, full text search or or a (full|indexed) scan)
         let mut plan: Arc<dyn ExecutionPlan> = match (&self.nearest, &self.full_text_query) {
             (Some(_), None) => {
@@ -2127,7 +2165,6 @@ impl Scanner {
 
     // ANN/KNN search execution node with optional prefilter
     async fn knn(&self, filter_plan: &FilterPlan) -> Result<Arc<dyn ExecutionPlan>> {
-        eprintln!("no idea");
         let Some(q) = self.nearest.as_ref() else {
             return Err(Error::invalid_input(
                 "No nearest query".to_string(),
@@ -2228,7 +2265,51 @@ impl Scanner {
         mut knn_node: Arc<dyn ExecutionPlan>,
         filter_plan: &FilterPlan,
     ) -> Result<Arc<dyn ExecutionPlan>> {
-        eprintln!("no idea part 2");
+        // (NOTE): Attempting to add desearlization logic for cagra binary file
+        //deserialize the proto index.index_details, figure out the index or message then reroute it to cagra path
+        // if let Some(any) = &index.index_details {
+        //     if any.type_url.contains("Cagra") {
+
+        //         let details: CagraIndexMetaDataDetails = CagraIndexMetaDataDetails::decode(&*any.value)?;
+        //         eprintln!("details are {:?}", details);
+
+        //         // let field = Field::new_arrow("_name", LanceDataType::)
+        //         // let empty_schema = Arc::new(Schema::new(vec![
+        //         //     Field::new("_name", "Cagra".to_string(), false)
+        //         // ]));
+        //         let empty_schema = Arc::new(ArrowSchema::empty());
+        //         let empty_exec = Arc::new(EmptyExec::new(empty_schema));
+        //         let exec: Arc<dyn ExecutionPlan> = empty_exec;
+
+        //         // Python::with_gil::<_, std::result::Result<(), lance_core::Error>>(|py| {
+        //         //     let module = PyModule::import(py, "lance.cagra").map_err(|e| Error::Index {
+        //         //         message: format!("Failed to import lance.cagra: {}", e),
+        //         //         location: location!(),
+        //         //     })?;
+
+        //         //     let function = module.getattr("search_cagra").map_err(|e| Error::Index {
+        //         //         message: format!("Failed to get attribute {}", e),
+        //         //         location: location!(),
+        //         //     })?;
+
+        //         //     let query_arr = q.key.as_any().downcast_ref::<Float32Array>().unwrap();
+        //         //     let mut query_vec = Vec::new();
+        //         //     for i in 0..query_arr.len() {
+        //         //         query_vec.push(query_arr.value(i));
+        //         //     }
+
+        //         //     // TODO: Remove hard code of k
+        //         //     let result = function.call1((query_vec, "/workspace/cagra_index.bin", 384)).map_err(|e| Error::Index {
+        //         //         message: format!("Failed to call function {}", e),
+        //         //         location: location!(),
+        //         //     })?;
+
+        //         //     Ok(())
+        //         // });
+        //         return Ok(exec);
+        //     }
+        // } 
+
         // Check if we've created new versions since the index was built.
         let unindexed_fragments = self.dataset.unindexed_fragments(&index.name).await?;
         if !unindexed_fragments.is_empty() {

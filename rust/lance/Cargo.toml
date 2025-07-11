@@ -80,6 +80,11 @@ tracing.workspace = true
 lazy_static = { workspace = true }
 humantime = { workspace = true }
 async_cell = "0.2.2"
+pyo3 = { version = "0.24.1", features = [
+    "extension-module",
+    "abi3-py39",
+    "py-clone",
+] }
 
 [target.'cfg(target_os = "linux")'.dev-dependencies]
 pprof.workspace = true
