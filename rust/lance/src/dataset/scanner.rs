@@ -2265,6 +2265,7 @@ impl Scanner {
         mut knn_node: Arc<dyn ExecutionPlan>,
         filter_plan: &FilterPlan,
     ) -> Result<Arc<dyn ExecutionPlan>> {
+<<<<<<< HEAD
         // (NOTE): Attempting to add desearlization logic for cagra binary file
         //deserialize the proto index.index_details, figure out the index or message then reroute it to cagra path
         // if let Some(any) = &index.index_details {
@@ -2309,6 +2310,45 @@ impl Scanner {
         //         return Ok(exec);
         //     }
         // } 
+=======
+        eprintln!("no idea part 2");
+        eprintln!("query in scanner is {:?}", q);
+        eprintln!("index in scanner is {:?}", index);
+        eprintln!("testing index extraction {:?}", index.index_details);
+
+        //deserialize the proto index.index_details, figure out the index or message then reroute it to cagra path
+        if let Some(any) = &index.index_details {
+            if any.type_url.contains("Cagra") {
+
+                let details: CagraIndexMetaDataDetails = CagraIndexMetaDataDetails::decode(&*any.value)?;
+                eprintln!("details are {:?}", details);
+
+                Python::with_gil::<_, std::result::Result<(), lance_core::Error>>(|py| {
+                    let module = PyModule::import(py, "lance.cagra").map_err(|e| Error::Index {
+                        message: format!("Failed to import lance.cagra: {}", e),
+                        location: location!(),
+                    })?;
+
+                    let function = module.getattr("search_cagra").map_err(|e| Error::Index {
+                        message: format!("Failed to get attribute {}", e),
+                        location: location!(),
+                    })?;
+
+                    // change queries array to one pyo3 can understand
+
+                    // TODO: Remove hard code of k
+                    function.call1((q.key, "/workspace/cagra_index.bin", 384)).map_err(|e| Error::Index {
+                        message: format!("Failed to call function {}", e),
+                        location: location!(),
+                    })?;
+
+                    Ok(())
+                });
+            }
+        } 
+
+        eprintln!("still came here i guess");
+>>>>>>> 45b25b74eac26ea6c345d3c54e29aad6c85e14c8
 
         // Check if we've created new versions since the index was built.
         let unindexed_fragments = self.dataset.unindexed_fragments(&index.name).await?;
