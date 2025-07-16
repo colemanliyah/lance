@@ -8,6 +8,9 @@ use arrow_array::{Array, PrimitiveArray, FixedSizeListArray};
 use std::sync::Arc;
 use arrow::datatypes::Float32Type;
 use pyo3::types::IntoPyDict;
+use arrow_array::Int64Array;
+use arrow_array::StringArray;
+use pyo3::Py;
 
 // Parameters for building product quantizer.
 #[derive(Debug, Clone)]
@@ -48,7 +51,7 @@ fn print_type<T>(_: &T) {
     println!("{:?}", std::any::type_name::<T>());
 }
 
-fn array_to_pylist(py: Python<'_>, array: &Arc<dyn arrow_array::Array>) -> Py<PyList> {
+fn data_array_to_pylist(py: Python<'_>, array: &Arc<dyn arrow_array::Array>) -> Py<PyList> {
     //eprintln!("{:?}", print_type(&array));
 
     if let Some(list_array) = array.as_any().downcast_ref::<FixedSizeListArray>() {
@@ -70,12 +73,28 @@ fn array_to_pylist(py: Python<'_>, array: &Arc<dyn arrow_array::Array>) -> Py<Py
     }
 }
 
+fn id_array_to_pylist(py: Python<'_>, array: &Arc<dyn arrow_array::Array>) -> Py<PyList> {
+    let mut id_values = PyList::empty(py);
+    if let Some(string_array) = array.as_any().downcast_ref::<StringArray>() {
+        for i in 0..string_array.len() {
+            let val = string_array.value(i);
+            match val.parse::<i64>() {
+                Ok(parsed) =>  id_values.append(parsed).unwrap(),
+                Err(err) => {
+                    eprintln!("Failed to parse '{}' as i64 at index {}: {}", val, i, err);
+                    continue;
+                }
+            }
+        }
+    }
+    return id_values.into();
+}
+
 pub async fn build_cagra_index(
     data: &Arc<dyn arrow_array::Array>,
+    ids: &Arc<dyn arrow_array::Array>,
     cagra_params: &CagraBuildParams
 ) -> Result<()> {
-    eprintln!("Cagra logic to go here");
-
     Python::with_gil(|py| {
         let module = PyModule::import(py, "lance.cagra").map_err(|e| Error::Index {
             message: format!("Failed to import lance.cagra: {}", e),
@@ -87,7 +106,7 @@ pub async fn build_cagra_index(
             location: location!(),
         })?;
 
-        let data_result = array_to_pylist(py, data);
+        let data_result = data_array_to_pylist(py, data);
         // if(data_result.is_empty()) {
         //     eprintln!("Data not transformed properly");
         // }
@@ -100,8 +119,11 @@ pub async fn build_cagra_index(
         // };
 
         let cagra_params_vec = cagra_params.iter(py);
+        let ids_pylist = id_array_to_pylist(py, ids);
 
-        function.call1((data_result, cagra_params_vec)).map_err(|e| Error::Index {
+        eprintln!("ids pylist is {:?}", ids_pylist);
+
+        function.call1((data_result, ids_pylist, cagra_params_vec)).map_err(|e| Error::Index {
             message: format!("Failed to call function {}", e),
             location: location!(),
         })?;

@@ -339,7 +339,6 @@ pub async fn save_cagra_index(
     index_name: &str,
     uuid: &str,
 ) -> Result<()> {
-    eprintln!("Maade i in save cagra index");
     let object_store = dataset.object_store();
     let index_dir = dataset.indices_dir();
     let dataset_version = dataset.version().version;

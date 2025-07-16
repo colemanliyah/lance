@@ -290,12 +290,21 @@ pub(crate) async fn build_vector_index(
             location: location!(),
         })?;
 
+        //Getting id column from data
+        let mut id_scanner = dataset.scan();
+        id_scanner.project(&["id"])?;
+        id_scanner.with_row_id();
+        let id_batch = id_scanner.try_into_batch().await?;
+
+        let ids = id_batch.column_by_name("id").ok_or(Error::Index {
+            message: format!("Column {} does not exist in returned batch", column),
+            location: location!(),
+        })?;
+
         // Calls Builder.rs file under lance-index and calls python to create index
-        let _ = lance_index::vector::cagra::build_cagra_index(data, cagra_params).await;
+        let _ = lance_index::vector::cagra::build_cagra_index(data, ids, cagra_params).await;
 
-        eprintln!("exited python functionality, about to save");
         // Call cagra module in this create to save the index
-
         return cagra::save_cagra_index(dataset, data, params.cagra_params.as_ref().unwrap(), column, name, uuid).await; // To change the unwrap part to if Some()
     }
 
