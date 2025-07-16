@@ -7,7 +7,7 @@ import pickle
 def build_cagra_index(data, ids, cagra_params):
     print("Cagra input params: ", cagra_params)
 
-    print("starting cp data build time")
+    print("starting move of data to gpu time")
     startCpData = time.time()
     cp_data = cp.array(data, dtype=cp.float32)
     endCpData = time.time()

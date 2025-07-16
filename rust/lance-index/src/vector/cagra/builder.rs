@@ -121,8 +121,6 @@ pub async fn build_cagra_index(
         let cagra_params_vec = cagra_params.iter(py);
         let ids_pylist = id_array_to_pylist(py, ids);
 
-        eprintln!("ids pylist is {:?}", ids_pylist);
-
         function.call1((data_result, ids_pylist, cagra_params_vec)).map_err(|e| Error::Index {
             message: format!("Failed to call function {}", e),
             location: location!(),

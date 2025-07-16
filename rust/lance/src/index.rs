@@ -271,7 +271,6 @@ impl DatasetIndexExt for Dataset {
         params: &dyn IndexParams,
         replace: bool,
     ) -> Result<()> {
-        eprintln!("index rust file!");
         if columns.len() != 1 {
             return Err(Error::Index {
                 message: "Only support building index on 1 column at the moment".to_string(),
@@ -286,7 +285,6 @@ impl DatasetIndexExt for Dataset {
             });
         };
 
-        eprintln!("deciding column!");
         // Load indices from the disk.
         let indices = self.load_indices().await?;
         let fri = self.open_frag_reuse_index(&NoOpMetricsCollector).await?;
@@ -311,10 +309,6 @@ impl DatasetIndexExt for Dataset {
                 });
             }
         }
-
-        eprintln!("indices, {:?}", indices);
-        eprintln!("index name {}" , index_name);
-        eprintln!("deciding indicies!");
 
         let index_id = Uuid::new_v4();
         let index_details = match (index_type, params.index_name()) {
@@ -354,7 +348,6 @@ impl DatasetIndexExt for Dataset {
                 inverted_index_details()
             }
             (IndexType::Vector, LANCE_VECTOR_INDEX) => {
-                eprintln!("vector index!");
                 // Vector index params.
                 let vec_params = params
                     .as_any()
@@ -364,7 +357,6 @@ impl DatasetIndexExt for Dataset {
                         location: location!(),
                     })?;
 
-                eprintln!("before going into build_vector_index");
                 // this is a large future so move it to heap
                 Box::pin(build_vector_index(
                     self,
@@ -427,8 +419,6 @@ impl DatasetIndexExt for Dataset {
             }
         };
 
-        eprintln!("before metadata!"); 
-
         let new_idx = IndexMetadata {
             uuid: index_id,
             name: index_name,
@@ -439,7 +429,7 @@ impl DatasetIndexExt for Dataset {
             index_version: index_type.version(),
         };
 
-        eprintln!("{:?}", new_idx);
+        eprintln!("New Index {:?}", new_idx);
 
         let transaction = Transaction::new(
             self.manifest.version,
@@ -847,7 +837,6 @@ impl DatasetIndexExt for Dataset {
         partition_id: usize,
         with_vector: bool,
     ) -> Result<SendableRecordBatchStream> {
-        eprintln!("alright then");
         let indices = self.load_indices_by_name(index_name).await?;
         if indices.is_empty() {
             return Err(Error::IndexNotFound {
@@ -999,7 +988,6 @@ impl DatasetIndexInternalExt for Dataset {
         uuid: &str,
         metrics: &dyn MetricsCollector,
     ) -> Result<Arc<dyn VectorIndex>> {
-        eprintln!("open vector index function");
         let cache_key = index_cache_key(self, uuid).await.unwrap();
         if let Some(index) = self.session.index_cache.get_vector(cache_key.as_ref()) {
             log::debug!("Found vector index in cache uuid: {}", uuid);
@@ -1011,17 +999,13 @@ impl DatasetIndexInternalExt for Dataset {
         let index_file = index_dir.child(INDEX_FILE_NAME);
         let reader: Arc<dyn Reader> = self.object_store.open(&index_file).await?.into();
 
-        eprintln!("trace 1");
-
         let tailing_bytes = read_last_block(reader.as_ref()).await?;
         let (major_version, minor_version) = read_version(&tailing_bytes)?;
 
         // the index file is in lance format since version (0,2)
         // TODO: we need to change the legacy IVF_PQ to be in lance format
-        eprintln!("trace 2");
         let index = match (major_version, minor_version) {
             (0, 1) | (0, 0) => {
-                eprintln!("what 1");
                 info!(target: TRACE_IO_EVENTS, index_uuid=uuid, type=IO_TYPE_OPEN_VECTOR, version="0.1", index_type="IVF_PQ");
                 let proto = open_index_proto(reader.as_ref()).await?;
                 match &proto.implementation {
@@ -1037,7 +1021,6 @@ impl DatasetIndexInternalExt for Dataset {
             }
 
             (0, 2) => {
-                eprintln!("what 2");
                 info!(target: TRACE_IO_EVENTS, index_uuid=uuid, type=IO_TYPE_OPEN_VECTOR, version="0.2", index_type="IVF_PQ");
                 let reader = FileReader::try_new_self_described_from_reader(
                     reader.clone(),
@@ -1049,7 +1032,6 @@ impl DatasetIndexInternalExt for Dataset {
             }
 
             (0, 3) => {
-                eprintln!("what 3");
                 let scheduler = ScanScheduler::new(
                     self.object_store.clone(),
                     SchedulerConfig::max_bandwidth(&self.object_store),
@@ -1065,7 +1047,6 @@ impl DatasetIndexInternalExt for Dataset {
                     FileReaderOptions::default(),
                 )
                 .await?;
-                eprintln!("trace 3");
                 let index_metadata = reader
                     .schema()
                     .metadata
@@ -1074,22 +1055,18 @@ impl DatasetIndexInternalExt for Dataset {
                         message: "Index Metadata not found".to_owned(),
                         location: location!(),
                     })?;
-                eprintln!("trace 4");
                 let index_metadata: lance_index::IndexMetadata =
                     serde_json::from_str(index_metadata)?;
-                eprintln!("trace 5");
                 let field = self.schema().field(column).ok_or_else(|| Error::Index {
                     message: format!("Column {} does not exist in the schema", column),
                     location: location!(),
                 })?;
 
-                eprintln!("trace 6");
                 let (_, element_type) = get_vector_type(self.schema(), column)?;
 
-                eprintln!("trace 7");
                 info!(target: TRACE_IO_EVENTS, index_uuid=uuid, type=IO_TYPE_OPEN_VECTOR, version="0.3", index_type=index_metadata.index_type);
 
-                eprintln!("{:?}", index_metadata.index_type);
+                eprintln!("Metadata index type {:?}", index_metadata.index_type);
                 match index_metadata.index_type.as_str() {
                     "IVF_FLAT" => match element_type {
                         DataType::Float16 | DataType::Float32 | DataType::Float64 => {
