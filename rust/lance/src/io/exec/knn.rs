@@ -459,7 +459,6 @@ impl ExecutionPlan for ANNIvfPartitionExec {
         partition: usize,
         _context: Arc<datafusion::execution::TaskContext>,
     ) -> DataFusionResult<SendableRecordBatchStream> {
-        eprintln!("In an execute function");
         let query = self.query.clone();
         let ds = self.dataset.clone();
         let metrics = Arc::new(AnnPartitionMetrics::new(&self.metrics, partition));
@@ -917,7 +916,6 @@ impl ExecutionPlan for ANNIvfSubIndexExec {
         partition: usize,
         context: Arc<datafusion::execution::context::TaskContext>,
     ) -> DataFusionResult<datafusion::physical_plan::SendableRecordBatchStream> {
-        eprintln!("desperate again");
         let input_stream = self.input.execute(partition, context.clone())?;
         let schema = self.schema();
         let query = self.query.clone();
