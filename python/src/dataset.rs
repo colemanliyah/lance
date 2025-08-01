@@ -1331,7 +1331,6 @@ impl Dataset {
         storage_options: Option<HashMap<String, String>>,
         kwargs: Option<&Bound<PyDict>>,
     ) -> PyResult<()> {
-        eprintln!("python source dataset file!");
         let columns: Vec<&str> = columns.iter().map(|s| &**s).collect();
         let index_type = index_type.to_uppercase();
         let idx_type = match index_type.as_str() {

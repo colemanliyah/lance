@@ -96,7 +96,6 @@ impl VectorIndexParams {
     }
 
     pub fn ivf_flat(num_partitions: usize, metric_type: MetricType) -> Self {
-        eprintln!("ivfpq vector rust file!");
         let ivf_params = IvfBuildParams::new(num_partitions);
         let stages = vec![StageParams::Ivf(ivf_params)];
         Self {
@@ -122,7 +121,6 @@ impl VectorIndexParams {
         metric_type: MetricType,
         max_iterations: usize,
     ) -> Self {
-        eprintln!("ivfpq vector rust file!");
         let mut stages: Vec<StageParams> = vec![];
         stages.push(StageParams::Ivf(IvfBuildParams::new(num_partitions)));
 
@@ -133,8 +131,6 @@ impl VectorIndexParams {
             ..Default::default()
         };
         stages.push(StageParams::PQ(pq_params));
-
-        eprintln!("finishes in vector.rs");
 
         Self {
             stages,
@@ -150,7 +146,6 @@ impl VectorIndexParams {
         ivf: IvfBuildParams,
         pq: PQBuildParams,
     ) -> Self {
-        eprintln!("ivfpq params vector rust file!");
         let stages = vec![StageParams::Ivf(ivf), StageParams::PQ(pq)];
         Self {
             stages,
@@ -168,7 +163,6 @@ impl VectorIndexParams {
         hnsw: HnswBuildParams,
         pq: PQBuildParams,
     ) -> Self {
-        eprintln!("ivf hnsw vector rust file!");
         let stages = vec![
             StageParams::Ivf(ivf),
             StageParams::Hnsw(hnsw),
@@ -190,7 +184,6 @@ impl VectorIndexParams {
         hnsw: HnswBuildParams,
         sq: SQBuildParams,
     ) -> Self {
-        eprintln!("ivfpq vector rust filehkgfhg!");
         let stages = vec![
             StageParams::Ivf(ivf),
             StageParams::Hnsw(hnsw),
@@ -210,7 +203,6 @@ impl VectorIndexParams {
         cagra_graph_degree: u32,
         cagra_build_algo: String,
     ) -> Self {
-        eprintln!("cagra vector rust file!");
 
         Self {
             stages: vec![], // unused
@@ -275,9 +267,6 @@ pub(crate) async fn build_vector_index(
     params: &VectorIndexParams,
     fri: Option<Arc<FragReuseIndex>>,
 ) -> Result<()> {
-    print!(" vector index rust file!");
-    eprintln!("number of rows {:?}", dataset.count_rows(None).await.unwrap());
-
     if let Some(cagra_params) = &params.cagra_params {
         // Getting the one embedding column of data         
         let mut scanner = dataset.scan();
@@ -335,7 +324,6 @@ pub(crate) async fn build_vector_index(
         }
     }
     
-    eprintln!("stages part is done");
     let temp_dir = tempdir()?;
     let temp_dir_path = Path::from_filesystem_path(temp_dir.path())?;
     let shuffler = IvfShuffler::new(temp_dir_path, ivf_params.num_partitions);
